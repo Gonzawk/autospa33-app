@@ -124,3 +124,116 @@
 .api-error-card strong{display:block;font-size:1.2rem;margin-bottom:8px}.api-error-card p{color:var(--muted);margin:0 0 20px;overflow-wrap:anywhere}
 
 .working-days-editor{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 18px}.working-days-editor label{display:flex;align-items:center;gap:7px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer}.working-days-editor input{width:auto;margin:0}
+
+/* Agenda por plataformas / recursos */
+.resource-step-kicker { display:block; margin-top:1.25rem; }
+.agenda-filters { display:flex; gap:.6rem; flex-wrap:wrap; }
+.agenda-filters select { min-width:150px; }
+.booking-warning { border-color:rgba(244,81,19,.35); }
+.selected-service-card > div { display:flex; flex-direction:column; gap:.25rem; }
+.selected-service-card span { display:flex; align-items:center; gap:.35rem; }
+@media (max-width: 720px) { .agenda-filters { width:100%; } .agenda-filters select { flex:1; min-width:0; } }
+
+/* =========================================================
+   TURNOS - confirmación final de solicitud
+   ========================================================= */
+.booking-success-backdrop {
+  z-index: 1200;
+  padding: 20px;
+}
+
+.booking-success-modal {
+  width: min(520px, 100%);
+  text-align: center;
+  padding: 34px;
+}
+
+.booking-success-icon {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 18px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(34, 197, 94, 0.12);
+  color: #16a34a;
+}
+
+.booking-success-modal h2 {
+  margin: 8px 0 10px;
+}
+
+.booking-success-copy {
+  margin: 0 auto 22px;
+  max-width: 430px;
+  color: var(--text-muted, #667085);
+  line-height: 1.6;
+}
+
+.booking-success-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 16px;
+  text-align: left;
+}
+
+.booking-success-summary > div {
+  padding: 13px 14px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  background: var(--surface-soft, rgba(148, 163, 184, 0.08));
+}
+
+.booking-success-summary span,
+.booking-success-summary strong {
+  display: block;
+}
+
+.booking-success-summary span {
+  margin-bottom: 4px;
+  font-size: 0.76rem;
+  color: var(--text-muted, #667085);
+}
+
+.booking-success-summary strong {
+  font-size: 0.94rem;
+}
+
+.booking-success-whatsapp {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 0 0 22px;
+  padding: 15px;
+  border-radius: 14px;
+  text-align: left;
+  background: rgba(37, 211, 102, 0.09);
+}
+
+.booking-success-whatsapp > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.booking-success-whatsapp strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.booking-success-whatsapp p {
+  margin: 0;
+  color: var(--text-muted, #667085);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 560px) {
+  .booking-success-modal {
+    padding: 28px 20px 22px;
+  }
+
+  .booking-success-summary {
+    grid-template-columns: 1fr;
+  }
+}

@@ -7,11 +7,13 @@ const CART_KEY = 'autospa33-cart-v8'
 export function AppDataProvider({ children }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
   const [cart, setCart] = useState(() => {
     try { return JSON.parse(localStorage.getItem(CART_KEY) || '[]') } catch { return [] }
   })
 
-  const refresh = async (admin = Boolean(adminCodeStorage.get())) => {
+  const refresh = async (admin = false) => {
+    setLoading(true)
     try {
       const next = admin ? await apiRepository.loadAdmin() : await apiRepository.loadPublic()
       setData(next)
@@ -25,12 +27,17 @@ export function AppDataProvider({ children }) {
         setError('')
         return next
       }
+      setError(err.message || 'No se pudo cargar la información.')
       throw err
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    refresh().catch(err => { setError(err.message); setData(null) })
+    // El arranque público nunca depende de una sesión administrativa previa.
+    // El área admin solicita su bootstrap únicamente al ingresar a /admin/*.
+    refresh(false).catch(() => {})
   }, [])
   useEffect(() => { localStorage.setItem(CART_KEY, JSON.stringify(cart)) }, [cart])
 
@@ -43,11 +50,21 @@ export function AppDataProvider({ children }) {
   const api = useMemo(() => ({
     data,
     error,
-    loading: !data && !error,
+    loading,
     cart,
     cartCount: cart.reduce((sum, x) => sum + x.quantity, 0),
     refreshPublic: () => refresh(false),
     refreshAdmin: () => refresh(true),
+    async refreshAppointments() {
+      const appointments = await apiRepository.getAdminAppointments()
+      setData(current => current ? { ...current, appointments } : current)
+      return appointments
+    },
+    async refreshOrders() {
+      const orders = await apiRepository.getAdminOrders()
+      setData(current => current ? { ...current, orders } : current)
+      return orders
+    },
 
     addToCart(productId, quantity = 1) {
       if (!data) return
@@ -77,6 +94,8 @@ export function AppDataProvider({ children }) {
       serviceCategoryId: data.serviceCategories.find(x => x.name === service.category)?.id ?? service.serviceCategoryId ?? null,
       name: service.name,
       durationMinutes: Number(service.durationMinutes),
+      bookingDurationMinutes: Number(service.bookingDurationMinutes || service.durationMinutes),
+      resourceType: service.resourceType || 'washing_platform',
       priceFrom: Number(service.priceFrom),
       active: Boolean(service.active),
       featured: Boolean(service.featured),
@@ -123,7 +142,7 @@ export function AppDataProvider({ children }) {
     saveSubcategory: (categoryId, subcategory) => mutateAdmin(() => apiRepository.saveSubcategory({ id: subcategory.id || 0, productCategoryId: categoryId, name: subcategory.name, active: subcategory.active !== false })),
     toggleSubcategory: (_categoryId, subcategoryId) => mutateAdmin(() => apiRepository.toggleSubcategory(subcategoryId)),
 
-    getAvailability: (serviceId, date) => apiRepository.getAvailability(serviceId, date),
+    getAvailability: (serviceId, date, preferredTime = '') => apiRepository.getAvailability(serviceId, date, preferredTime),
     async requestAppointment(appointment) {
       const result = await apiRepository.requestAppointment({
         serviceId: appointment.serviceId,
@@ -137,6 +156,7 @@ export function AppDataProvider({ children }) {
     },
     saveAppointment: appointment => mutateAdmin(() => apiRepository.saveAppointment({
       serviceId: appointment.serviceId ?? null,
+      workResourceId: appointment.workResourceId,
       date: appointment.date,
       time: appointment.time,
       durationMinutes: Number(appointment.durationMinutes) || 60,
@@ -160,7 +180,6 @@ export function AppDataProvider({ children }) {
     async createOrder(order) {
       const created = await apiRepository.createOrder(order)
       setCart([])
-      await refresh(false)
       return created
     },
     updateOrder: async (id, patch) => {
@@ -170,7 +189,7 @@ export function AppDataProvider({ children }) {
     async confirmSale(payload) {
       try {
         let sale
-        if (payload.source === 'whatsapp_order' && payload.orderId) {
+        if (payload.orderId) {
           sale = await apiRepository.confirmOrder(payload.orderId, {
             paymentMethod: payload.paymentMethod,
             notes: payload.notes || '',
@@ -198,7 +217,7 @@ export function AppDataProvider({ children }) {
         <div className="api-error-card">
           <strong>No se pudo conectar con AutoSpa #33</strong>
           <p>{error}</p>
-          <button className="btn btn-primary" type="button" onClick={() => { setError(''); refresh(false).catch(err => setError(err.message)) }}>Reintentar</button>
+          <button className="btn btn-primary" type="button" onClick={() => { setError(''); refresh(false).catch(() => {}) }}>Reintentar</button>
         </div>
       </div>
     )

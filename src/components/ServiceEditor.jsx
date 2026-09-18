@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 
-const empty = { id:0, name:'', category:'Lavado', durationMinutes:60, priceFrom:0, active:true, featured:false, sortOrder:1, description:'', includes:[] }
+const empty = {
+  id:0, name:'', category:'Lavado', durationMinutes:135, bookingDurationMinutes:135,
+  resourceType:'washing_platform', priceFrom:0, active:true, featured:false,
+  sortOrder:1, description:'', includes:[]
+}
 
 export default function ServiceEditor({ service, categories, onClose, onSave }) {
   const [form, setForm] = useState(service || empty)
   const [includesText, setIncludesText] = useState((service?.includes || []).join(', '))
 
   useEffect(() => {
-    setForm(service || { ...empty, category: categories[0]?.name || 'General' })
+    setForm(service ? { ...service, bookingDurationMinutes: service.bookingDurationMinutes || service.durationMinutes, resourceType: service.resourceType || 'washing_platform' } : { ...empty, category: categories[0]?.name || 'General' })
     setIncludesText((service?.includes || []).join(', '))
   }, [service, categories])
 
@@ -18,6 +22,7 @@ export default function ServiceEditor({ service, categories, onClose, onSave }) 
       ...form,
       priceFrom: Number(form.priceFrom),
       durationMinutes: Number(form.durationMinutes),
+      bookingDurationMinutes: Number(form.bookingDurationMinutes),
       sortOrder: Number(form.sortOrder),
       includes: includesText.split(',').map(x => x.trim()).filter(Boolean)
     })
@@ -37,8 +42,13 @@ export default function ServiceEditor({ service, categories, onClose, onSave }) 
           </div>
           <div className="form-grid">
             <label><span>Precio desde</span><input type="number" min="0" value={form.priceFrom} onChange={e => setForm({...form,priceFrom:e.target.value})}/></label>
-            <label><span>Duración (min)</span><input type="number" min="15" value={form.durationMinutes} onChange={e => setForm({...form,durationMinutes:e.target.value})}/></label>
+            <label><span>Duración total estimada (min)</span><input type="number" min="1" value={form.durationMinutes} onChange={e => setForm({...form,durationMinutes:e.target.value})}/></label>
           </div>
+          <div className="form-grid">
+            <label><span>Recurso de agenda</span><select value={form.resourceType} onChange={e => setForm({...form,resourceType:e.target.value})}><option value="washing_platform">Plataforma de lavado</option><option value="treatment_area">Área de tratamientos</option></select></label>
+            <label><span>Tiempo que bloquea agenda (min)</span><input type="number" min="1" step="15" value={form.bookingDurationMinutes} onChange={e => setForm({...form,bookingDurationMinutes:e.target.value})}/></label>
+          </div>
+          <p className="form-helper">La duración total informa cuánto tarda el tratamiento. El tiempo de bloqueo define cuánto tiempo queda ocupado el recurso. Ej.: Cerámico 4320 min (72 h), bloqueo 180 min.</p>
           <label><span>Descripción</span><textarea required value={form.description} onChange={e => setForm({...form,description:e.target.value})}/></label>
           <label><span>Incluye (separado por comas)</span><input value={includesText} onChange={e => setIncludesText(e.target.value)}/></label>
           <div className="toggle-row">
