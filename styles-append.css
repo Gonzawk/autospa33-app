@@ -1,0 +1,10 @@
+/* RC3 · Próximos turnos, historial y cobro */
+.appointment-summary-panel { margin-bottom: 1.25rem; }
+.appointment-history-grid { display: grid; gap: .75rem; }
+.appointment-history-card { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem; border:1px solid var(--border, #e5e7eb); border-radius:14px; background:var(--surface, #fff); }
+.appointment-history-card > div { display:grid; gap:.28rem; }
+.appointment-history-card small { opacity:.76; }
+.status.completed { background:#e8f7ee; color:#176b3a; }
+.charge-summary,.charge-total { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem; border-radius:12px; background:rgba(127,127,127,.08); }
+.charge-total strong { font-size:1.3rem; }
+@media (max-width: 680px) { .appointment-history-card { align-items:flex-start; flex-direction:column; } .appointment-history-card .btn { width:100%; } }

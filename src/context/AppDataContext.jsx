@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { apiRepository, adminCodeStorage } from '../repositories/apiRepository'
 
 const AppDataContext = createContext(null)
+
+const listItems = value => Array.isArray(value) ? value : Array.isArray(value?.items) ? value.items : []
 const CART_KEY = 'autospa33-cart-v8'
 
 export function AppDataProvider({ children }) {
@@ -56,12 +58,14 @@ export function AppDataProvider({ children }) {
     refreshPublic: () => refresh(false),
     refreshAdmin: () => refresh(true),
     async refreshAppointments() {
-      const appointments = await apiRepository.getAdminAppointments()
+      const response = await apiRepository.getAdminAppointments({ page: 1, pageSize: 100 })
+      const appointments = listItems(response)
       setData(current => current ? { ...current, appointments } : current)
       return appointments
     },
     async refreshOrders() {
-      const orders = await apiRepository.getAdminOrders()
+      const response = await apiRepository.getAdminOrders({ page: 1, pageSize: 100 })
+      const orders = listItems(response)
       setData(current => current ? { ...current, orders } : current)
       return orders
     },
@@ -166,6 +170,7 @@ export function AppDataProvider({ children }) {
       status: appointment.status
     })),
     setAppointmentStatus: (id, status) => mutateAdmin(() => apiRepository.setAppointmentStatus(id, status)),
+    chargeAppointment: (id, payload) => mutateAdmin(() => apiRepository.chargeAppointment(id, payload)),
 
     saveSupplier: supplier => mutateAdmin(() => apiRepository.saveSupplier(supplier)),
     toggleSupplier: id => mutateAdmin(() => apiRepository.toggleSupplier(id)),
@@ -186,23 +191,31 @@ export function AppDataProvider({ children }) {
       if (patch.status !== 'cancelled') throw new Error('La API solo permite cancelar o confirmar pedidos.')
       return mutateAdmin(() => apiRepository.cancelOrder(id))
     },
+    async confirmOrder(id, payload) {
+      try {
+        const order = await apiRepository.confirmOrder(id, {
+          notes: payload.notes || '',
+          items: payload.items.map(x => ({ productId: x.productId, quantity: Number(x.quantity), unitPrice: Number(x.unitPrice) }))
+        })
+        await refreshOrders()
+        return { ok: true, order }
+      } catch (err) { return { ok: false, error: err.message } }
+    },
+    async closeOrder(id, payload = {}) {
+      try {
+        const sale = await apiRepository.closeOrder(id, payload)
+        await refresh(true)
+        return { ok: true, sale }
+      } catch (err) { return { ok: false, error: err.message } }
+    },
     async confirmSale(payload) {
       try {
-        let sale
-        if (payload.orderId) {
-          sale = await apiRepository.confirmOrder(payload.orderId, {
-            paymentMethod: payload.paymentMethod,
-            notes: payload.notes || '',
-            items: payload.items.map(x => ({ productId: x.productId, quantity: Number(x.quantity), unitPrice: Number(x.unitPrice) }))
-          })
-        } else {
-          sale = await apiRepository.registerSale({
-            source: payload.source || 'pos', orderId: payload.orderId || null,
-            customerName: payload.customerName || 'Venta mostrador', phone: payload.phone || '',
-            paymentMethod: payload.paymentMethod || 'Efectivo', notes: payload.notes || '',
-            items: payload.items.map(x => ({ productId: x.productId, quantity: Number(x.quantity), unitPrice: x.unitPrice == null ? null : Number(x.unitPrice) }))
-          })
-        }
+        const sale = await apiRepository.registerSale({
+          source: payload.source || 'pos', orderId: null,
+          customerName: payload.customerName || 'Venta mostrador', phone: payload.phone || '',
+          paymentMethod: payload.paymentMethod || 'Efectivo', notes: payload.notes || '',
+          items: payload.items.map(x => ({ productId: x.productId, quantity: Number(x.quantity), unitPrice: x.unitPrice == null ? null : Number(x.unitPrice) }))
+        })
         await refresh(true)
         return { ok: true, sale }
       } catch (err) { return { ok: false, error: err.message } }
