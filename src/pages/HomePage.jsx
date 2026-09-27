@@ -20,7 +20,7 @@ export default function HomePage() {
         <div className="container hero-grid">
           <div className="hero-copy">
             <div className="eyebrow"><Sparkles size={16}/> {data.settings.tagline}</div>
-            <div className="hero-brand-line"><BrandLogo/><span>{data.settings.displayName}</span></div>
+            <div className="hero-brand-line"><BrandLogo/></div>
             <h1>{data.settings.heroTitle}</h1>
             <p>{data.settings.heroSubtitle}</p>
             <div className="hero-actions">

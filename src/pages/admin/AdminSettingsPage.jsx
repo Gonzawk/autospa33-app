@@ -25,8 +25,6 @@ export default function AdminSettingsPage() {
       <div className="settings-layout">
         <aside className="settings-brand-card">
           <BrandLogo/>
-          <h2>{form.displayName}</h2>
-          <p>{form.tagline}</p>
           <small>Nombre técnico recomendado: <strong>{form.technicalName}</strong></small>
           <small>Dominio: <strong>{form.domain}</strong></small>
         </aside>

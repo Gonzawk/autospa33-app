@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { Menu, Moon, ShieldCheck, ShoppingCart, Sun, X } from 'lucide-react'
+import { CalendarDays, Menu, Moon, ShieldCheck, ShoppingCart, Sun, X } from 'lucide-react'
 import BrandLogo from './BrandLogo'
 import { useTheme } from '../context/ThemeContext'
 import { useAppData } from '../context/AppDataContext'
@@ -15,7 +15,7 @@ export default function PublicHeader() {
     <nav className={`nav ${open?'nav-open':''}`}>
       <NavLink to="/" end onClick={()=>setOpen(false)}>Inicio</NavLink>
       <NavLink to="/servicios" onClick={()=>setOpen(false)}>Servicios</NavLink>
-      {data.settings.bookingsEnabled&&<NavLink to="/turnos" onClick={()=>setOpen(false)}>Turnos</NavLink>}
+      {data.settings.bookingsEnabled&&<NavLink to="/turnos" onClick={()=>setOpen(false)}><CalendarDays size={16}/> Turnos</NavLink>}
       {data.settings.storeEnabled&&<NavLink to="/store" onClick={()=>setOpen(false)}>Store</NavLink>}
       <NavLink to="/admin" onClick={()=>setOpen(false)}><ShieldCheck size={16}/> Admin</NavLink>
     </nav>

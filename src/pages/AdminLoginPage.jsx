@@ -32,7 +32,7 @@ export default function AdminLoginPage() {
       <div className="admin-login-card">
         <BrandLogo/>
         <div className="lock-circle"><LockKeyhole size={25}/></div>
-        <span className="section-kicker">AutoSpa #33</span>
+        <span className="section-kicker">Acceso privado</span>
         <h1>Administración</h1>
         <p>Gestión integral de turnos, productos, compras, stock, pedidos y ventas.</p>
         <form onSubmit={submit}>
