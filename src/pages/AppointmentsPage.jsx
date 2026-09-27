@@ -3,7 +3,7 @@ import { CalendarCheck2, CheckCircle2, Clock3, Info, MessageCircle, Phone, UserR
 import { useSearchParams } from 'react-router-dom'
 import AppointmentCalendar from '../components/AppointmentCalendar'
 import { useAppData } from '../context/AppDataContext'
-import { formatDate, minutesToTime, timeToMinutes } from '../utils/appointments'
+import { formatDate } from '../utils/appointments'
 
 const durationLabel = minutes => {
   if (minutes >= 1440 && minutes % 1440 === 0) return `${minutes / 1440} día${minutes === 1440 ? '' : 's'}`
@@ -19,7 +19,6 @@ export default function AppointmentsPage() {
   const [serviceId, setServiceId] = useState(Number.isFinite(requestedServiceId) ? requestedServiceId : 0)
   const [month, setMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selectedDate, setSelectedDate] = useState('')
-  const [preferredTime, setPreferredTime] = useState('')
   const [selectedTime, setSelectedTime] = useState('')
   const [availability, setAvailability] = useState(null)
   const [slotsLoading, setSlotsLoading] = useState(false)
@@ -35,41 +34,41 @@ export default function AppointmentsPage() {
   )
   const selectedService = services.find(item => item.id === Number(serviceId)) || null
 
-  const preferredTimes = useMemo(() => {
-    if (!selectedService || !data?.appointmentSettings) return []
-    const settings = data.appointmentSettings
-    const start = timeToMinutes(settings.startTime || '08:30')
-    const end = timeToMinutes(settings.endTime || '19:00')
-    const interval = Number(settings.slotIntervalMinutes || 30)
-    const bookingDuration = Number(selectedService.bookingDurationMinutes || selectedService.durationMinutes || interval)
-    const result = []
-    for (let cursor = start; cursor + bookingDuration <= end; cursor += interval) result.push(minutesToTime(cursor))
-    return result
-  }, [selectedService, data?.appointmentSettings])
-
   useEffect(() => {
     let active = true
+
     setSelectedTime('')
     setAvailability(null)
     setSlotsError('')
 
-    if (!selectedService || !selectedDate || !preferredTime) return () => { active = false }
+    // La disponibilidad se consulta apenas existe servicio + fecha.
+    // El frontend NO fabrica horarios: renderiza exclusivamente los slots
+    // devueltos por la API, que ya contempla recursos ocupados y hora actual.
+    if (!selectedService || !selectedDate) {
+      setSlotsLoading(false)
+      return () => { active = false }
+    }
 
     setSlotsLoading(true)
-    getAvailability(selectedService.id, selectedDate, preferredTime)
-      .then(result => { if (active) setAvailability(result) })
-      .catch(err => { if (active) setSlotsError(err.message) })
-      .finally(() => { if (active) setSlotsLoading(false) })
+    getAvailability(selectedService.id, selectedDate)
+      .then(result => {
+        if (active) setAvailability(result)
+      })
+      .catch(err => {
+        if (active) setSlotsError(err.message)
+      })
+      .finally(() => {
+        if (active) setSlotsLoading(false)
+      })
 
     return () => { active = false }
-  }, [selectedService?.id, selectedDate, preferredTime])
+  }, [selectedService?.id, selectedDate])
 
   if (loading || !data) return <div className="screen-loader">Cargando agenda…</div>
   if (!data.settings?.bookingsEnabled) return <div className="screen-loader">La solicitud de turnos está temporalmente deshabilitada.</div>
 
   const resetAfterService = () => {
     setSelectedDate('')
-    setPreferredTime('')
     setSelectedTime('')
     setAvailability(null)
     setSuccess(null)
@@ -83,17 +82,10 @@ export default function AppointmentsPage() {
 
   const selectDate = key => {
     setSelectedDate(key)
-    setPreferredTime('')
     setSelectedTime('')
     setAvailability(null)
     setSuccess(null)
     setSlotsError('')
-  }
-
-  const selectPreferredTime = value => {
-    setPreferredTime(value)
-    setSelectedTime('')
-    setSuccess(null)
   }
 
   const openRequest = time => {
@@ -134,8 +126,7 @@ export default function AppointmentsPage() {
       // El snapshot anterior conserva únicamente los datos necesarios para el modal.
       setServiceId(0)
       setSelectedDate('')
-      setPreferredTime('')
-      setSelectedTime('')
+        setSelectedTime('')
       setAvailability(null)
       setSlotsError('')
       setForm({ fullName: '', phone: '', notes: '' })
@@ -144,7 +135,7 @@ export default function AppointmentsPage() {
       setFormOpen(false)
       setSlotsError(err.message)
       try {
-        const refreshed = await getAvailability(selectedService.id, selectedDate, preferredTime)
+        const refreshed = await getAvailability(selectedService.id, selectedDate)
         setAvailability(refreshed)
       } catch { /* El mensaje original es el más útil. */ }
     } finally {
@@ -230,17 +221,7 @@ export default function AppointmentsPage() {
               {!selectedService && <div className="empty-slots">Primero elegí un servicio.</div>}
               {selectedService && !selectedDate && <div className="empty-slots">Elegí un día disponible en el calendario.</div>}
 
-              {selectedService && selectedDate && (
-                <label className="booking-field" style={{ marginBottom: 16 }}>
-                  <span>¿A qué hora preferís venir?</span>
-                  <select value={preferredTime} onChange={e => selectPreferredTime(e.target.value)}>
-                    <option value="">Seleccionar horario preferido</option>
-                    {preferredTimes.map(time => <option key={time} value={time}>{time}</option>)}
-                  </select>
-                </label>
-              )}
-
-              {selectedService && selectedDate && preferredTime && slotsLoading && (
+              {selectedService && selectedDate && slotsLoading && (
                 <div className="empty-slots">Consultando disponibilidad real…</div>
               )}
 
@@ -259,11 +240,11 @@ export default function AppointmentsPage() {
                         <button
                           type="button"
                           key={slot.time}
-                          className={`time-slot free ${slot.time === preferredTime ? 'selected' : ''}`}
+                          className="time-slot free"
                           onClick={() => openRequest(slot.time)}
                         >
                           <strong>{slot.time}</strong>
-                          <small>{slot.time === preferredTime ? 'Tu horario preferido' : 'Horario disponible'}</small>
+                          <small>Horario disponible</small>
                         </button>
                       ))}
                     </div>

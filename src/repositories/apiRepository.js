@@ -8,7 +8,7 @@ const parseBody = async response => {
 }
 
 const request = async (path, options = {}) => {
-  const { admin = false, body, headers = {}, ...rest } = options
+  const { admin = false, body, headers = {}, timeoutMs = 20000, signal, ...rest } = options
   const finalHeaders = { Accept: 'application/json', 'ngrok-skip-browser-warning': 'true', ...headers }
   if (admin) {
     const code = sessionStorage.getItem(ADMIN_CODE_KEY)
@@ -19,7 +19,23 @@ const request = async (path, options = {}) => {
     finalHeaders['Content-Type'] = 'application/json'
     payload = JSON.stringify(body)
   }
-  const response = await fetch(`${API_URL}${path}`, { ...rest, headers: finalHeaders, body: payload })
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
+  if (signal) {
+    if (signal.aborted) controller.abort()
+    else signal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
+
+  let response
+  try {
+    response = await fetch(`${API_URL}${path}`, { ...rest, headers: finalHeaders, body: payload, signal: controller.signal })
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('La API tardó demasiado en responder. Volvé a intentar.')
+    throw error
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
+
   const data = await parseBody(response)
   if (!response.ok) {
     const message = data?.message || (typeof data === 'string' ? data : `Error HTTP ${response.status}`)
@@ -70,7 +86,9 @@ export const apiRepository = {
   getAdminProducts: params => request(`/api/admin/products?${queryString(params)}`, { admin: true }),
   getAdminSuppliers: params => request(`/api/admin/suppliers?${queryString(params)}`, { admin: true }),
   getAdminPurchases: params => request(`/api/admin/purchases?${queryString(params)}`, { admin: true }),
+  getAdminPurchase: id => request(`/api/admin/purchases/${id}`, { admin: true }),
   getAdminSales: params => request(`/api/admin/sales?${queryString(params)}`, { admin: true }),
+  getAdminSale: id => request(`/api/admin/sales/${id}`, { admin: true }),
   getAdminOrders: params => request(`/api/admin/orders?${queryString(params)}`, { admin: true }),
   getAdminAppointments: params => request(`/api/admin/appointments?${queryString(params)}`, { admin: true }),
   getStockMovements: params => request(`/api/admin/inventory/movements?${queryString(params)}`, { admin: true }),

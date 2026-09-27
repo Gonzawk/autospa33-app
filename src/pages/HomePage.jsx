@@ -74,8 +74,10 @@ export default function HomePage() {
             <div className="product-preview-grid">
               {featuredProducts.map(item => (
                 <article className="product-preview" key={item.id}>
-                  <img src={item.image} alt={item.name}/>
-                  <div><small>{item.brand} · {item.subcategory}</small><h3>{item.name}</h3>{data.settings.showPrices && <strong>{money(item.price)}</strong>}</div>
+                  <Link className="product-preview-image" to={`/store/producto/${item.id}`} aria-label={`Ver ${item.name}`}>
+                    <img src={item.image} alt={item.name}/>
+                  </Link>
+                  <div><small>{item.brand} · {item.subcategory}</small><h3><Link to={`/store/producto/${item.id}`}>{item.name}</Link></h3>{data.settings.showPrices && <strong>{money(item.price)}</strong>}</div>
                 </article>
               ))}
             </div>

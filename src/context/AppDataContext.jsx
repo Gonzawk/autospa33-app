@@ -49,6 +49,16 @@ export function AppDataProvider({ children }) {
     return result
   }
 
+  // Función real compartida por la pantalla y por confirmOrder.
+  // No se referencia un método hermano del objeto useMemo (eso provocaba
+  // "refreshOrders is not defined" después de confirmar).
+  const refreshOrdersData = async () => {
+    const response = await apiRepository.getAdminOrders({ page: 1, pageSize: 100, status: 'active' })
+    const orders = listItems(response)
+    setData(current => current ? { ...current, orders } : current)
+    return orders
+  }
+
   const api = useMemo(() => ({
     data,
     error,
@@ -63,12 +73,7 @@ export function AppDataProvider({ children }) {
       setData(current => current ? { ...current, appointments } : current)
       return appointments
     },
-    async refreshOrders() {
-      const response = await apiRepository.getAdminOrders({ page: 1, pageSize: 100 })
-      const orders = listItems(response)
-      setData(current => current ? { ...current, orders } : current)
-      return orders
-    },
+    refreshOrders: refreshOrdersData,
 
     addToCart(productId, quantity = 1) {
       if (!data) return
@@ -197,7 +202,7 @@ export function AppDataProvider({ children }) {
           notes: payload.notes || '',
           items: payload.items.map(x => ({ productId: x.productId, quantity: Number(x.quantity), unitPrice: Number(x.unitPrice) }))
         })
-        await refreshOrders()
+        await refreshOrdersData()
         return { ok: true, order }
       } catch (err) { return { ok: false, error: err.message } }
     },
@@ -211,7 +216,7 @@ export function AppDataProvider({ children }) {
     async confirmSale(payload) {
       try {
         const sale = await apiRepository.registerSale({
-          source: payload.source || 'pos', orderId: null,
+          source: 'pos', orderId: null,
           customerName: payload.customerName || 'Venta mostrador', phone: payload.phone || '',
           paymentMethod: payload.paymentMethod || 'Efectivo', notes: payload.notes || '',
           items: payload.items.map(x => ({ productId: x.productId, quantity: Number(x.quantity), unitPrice: x.unitPrice == null ? null : Number(x.unitPrice) }))

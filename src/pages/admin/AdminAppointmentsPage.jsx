@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Ban, CalendarPlus, Check, Clock3, DollarSign, MapPin, MessageCircle, Phone, RefreshCw, UserRound, X, XCircle } from 'lucide-react'
+import { Ban, CalendarPlus, Check, CheckCircle2, Clock3, MapPin, MessageCircle, Phone, RefreshCw, UserRound, X, XCircle } from 'lucide-react'
 import AppointmentCalendar from '../../components/AppointmentCalendar'
 import { useAppData } from '../../context/AppDataContext'
 import { formatDate, formatShortDate, toDateKey } from '../../utils/appointments'
 import { buildWhatsappUrl } from '../../utils/whatsapp'
 
 const statusText = status => ({ pending:'Pendiente', confirmed:'Confirmado', completed:'Completado', blocked:'Bloqueado', cancelled:'Cancelado' }[status] || status)
-const money = value => new Intl.NumberFormat('es-AR', { style:'currency', currency:'ARS', maximumFractionDigits:2 }).format(Number(value || 0))
 const timeHHMM = value => String(value || '').slice(0,5)
 const durationLabel = m => m >= 1440 && m % 1440 === 0 ? `${m/1440} días` : m >= 60 ? `${Math.floor(m/60)} h${m%60 ? ` ${m%60} min` : ''}` : `${m} min`
 const confirmationMessage = item => `Hola ${item.fullName}, te confirmamos tu turno en AutoSpa #33.\n\nServicio: ${item.serviceName}\nFecha: ${formatShortDate(item.date)}\nHora: ${timeHHMM(item.time)}\n\n¡Te esperamos!`
 
 export default function AdminAppointmentsPage() {
-  const { data, loading, saveAppointment, setAppointmentStatus, chargeAppointment, refreshAppointments } = useAppData()
+  const { data, loading, saveAppointment, setAppointmentStatus, refreshAppointments } = useAppData()
   const [month, setMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selectedDate, setSelectedDate] = useState(toDateKey(new Date()))
   const [filter, setFilter] = useState('active')
@@ -21,8 +20,6 @@ export default function AdminAppointmentsPage() {
   const [busyId, setBusyId] = useState(null)
   const [message, setMessage] = useState('')
   const [pageError, setPageError] = useState('')
-  const [chargeTarget, setChargeTarget] = useState(null)
-  const [chargeForm, setChargeForm] = useState({ paymentMethod:'Efectivo', discountType:'none', discountValue:0, notes:'' })
   const [form, setForm] = useState({ type:'appointment', serviceId:'', workResourceId:'', time:'08:30', fullName:'', phone:'', durationMinutes:60 })
 
   useEffect(() => {
@@ -41,7 +38,6 @@ export default function AdminAppointmentsPage() {
 
   const pending = appointments.filter(item => item.status === 'pending').sort((a,b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
   const upcoming = appointments.filter(item => item.status === 'confirmed').sort((a,b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
-  const history = appointments.filter(item => item.status === 'completed').sort((a,b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`))
   if (loading || !data) return <div className="screen-loader">Cargando agenda…</div>
 
   const services = (data.services || []).filter(item => item.active)
@@ -54,24 +50,18 @@ export default function AdminAppointmentsPage() {
 
   const changeStatus = async (item, status) => {
     setBusyId(item.id); setPageError(''); setMessage('')
-    try { await setAppointmentStatus(item.id, status); setMessage(status === 'confirmed' ? `Turno de ${item.fullName} confirmado correctamente.` : `Solicitud de ${item.fullName} cancelada.`) }
+    try {
+      await setAppointmentStatus(item.id, status)
+      const text = status === 'confirmed'
+        ? `Turno de ${item.fullName} confirmado correctamente.`
+        : status === 'completed'
+          ? `Servicio de ${item.fullName} marcado como completado. Ya está disponible para cobrar en Caja.`
+          : `Turno de ${item.fullName} cancelado.`
+      setMessage(text)
+    }
     catch (err) { setPageError(err.message) }
     finally { setBusyId(null) }
   }
-  const openCharge = item => { setChargeTarget(item); setChargeForm({ paymentMethod:'Efectivo', discountType:'none', discountValue:0, notes:'' }); setPageError(''); setMessage('') }
-  const submitCharge = async event => {
-    event.preventDefault(); if (!chargeTarget) return
-    setBusyId(chargeTarget.id); setPageError(''); setMessage('')
-    try {
-      const result = await chargeAppointment(chargeTarget.id, { ...chargeForm, discountValue:Number(chargeForm.discountValue)||0 })
-      setMessage(`Turno cobrado correctamente. Venta ${result.saleNumber} por ${money(result.finalAmount)}.`)
-      setChargeTarget(null)
-      await refreshAppointments()
-    } catch (err) { setPageError(err.message) } finally { setBusyId(null) }
-  }
-  const chargeBase = Number(chargeTarget?.servicePriceSnapshot || 0)
-  const chargeDiscount = chargeForm.discountType === 'percent' ? chargeBase * (Number(chargeForm.discountValue)||0) / 100 : chargeForm.discountType === 'amount' ? Number(chargeForm.discountValue)||0 : 0
-  const chargeFinal = Math.max(0, chargeBase - Math.min(chargeBase, chargeDiscount))
   const sendConfirmation = item => { const url=buildWhatsappUrl(item.phone, confirmationMessage(item)); if (!url) return setPageError('El turno no tiene un WhatsApp válido.'); window.open(url,'_blank','noopener,noreferrer') }
   const modalResources = form.type === 'blocked' ? resources : compatibleResources(form.serviceId)
 
@@ -82,11 +72,7 @@ export default function AdminAppointmentsPage() {
 
     {pending.length > 0 && <section className="admin-panel pending-requests-panel"><div className="panel-heading"><div><span className="section-kicker">Requieren atención</span><h2>Solicitudes pendientes</h2></div></div><div className="pending-request-list">{pending.map(item=><article className="pending-request-card" key={item.id}><div className="pending-request-main"><span className="status pending">Pendiente</span><strong>{item.fullName}</strong><span>{item.serviceName}</span><small>{formatShortDate(item.date)} · {timeHHMM(item.time)} · {item.workResourceName}</small><small>Bloqueo: {durationLabel(item.bookingDurationMinutes)} · Duración total: {durationLabel(item.durationMinutes)}</small>{item.notes && <small>Nota: {item.notes}</small>}</div><div className="pending-request-contact"><Phone size={14}/> {item.phone}</div><div className="request-actions"><button disabled={busyId===item.id} className="btn btn-primary" onClick={()=>changeStatus(item,'confirmed')}><Check size={16}/> Confirmar</button><button disabled={busyId===item.id} className="btn btn-secondary" onClick={()=>changeStatus(item,'cancelled')}><XCircle size={16}/> Rechazar</button></div></article>)}</div></section>}
 
-    <section className="admin-panel appointment-summary-panel"><div className="panel-heading"><div><span className="section-kicker">Servicios realizados</span><h2>Historial de turnos</h2><p>Los turnos confirmados pasan aquí automáticamente cuando finaliza el tiempo reservado.</p></div></div><div className="appointment-history-grid">{history.length===0&&<div className="empty-agenda">Todavía no hay turnos completados.</div>}{history.map(item=><article className="appointment-history-card" key={item.id}><div><span className="status completed">Completado</span><strong>{item.fullName}</strong><span>{item.serviceName}</span><small>{formatShortDate(item.date)} · {timeHHMM(item.time)}</small><small>Importe del servicio: {money(item.servicePriceSnapshot)}</small>{item.saleId&&<small><strong>Cobrado · {money(item.finalAmount)}</strong>{item.discountAmount>0?` · Descuento ${money(item.discountAmount)}`:''}</small>}</div>{!item.saleId&&item.serviceId&&<button className="btn btn-primary" onClick={()=>openCharge(item)}><DollarSign size={16}/> Marcar cobrado</button>}</article>)}</div></section>
-
-    <div className="admin-booking-layout"><AppointmentCalendar data={data} month={month} onMonthChange={setMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} admin/><section className="admin-day-agenda"><div className="day-agenda-header"><div><span className="section-kicker">Agenda del día</span><h2>{formatDate(selectedDate)}</h2></div><div className="agenda-filters"><select value={resourceFilter} onChange={e=>setResourceFilter(e.target.value)}><option value="all">Todos los recursos</option>{resources.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select><select value={filter} onChange={e=>setFilter(e.target.value)}><option value="active">Activos</option><option value="pending">Pendientes</option><option value="confirmed">Confirmados</option><option value="blocked">Bloqueos</option><option value="completed">Completados</option><option value="all">Todos</option></select></div></div><div className="day-agenda-list">{selectedDayItems.length===0&&<div className="empty-agenda">No hay turnos registrados para este filtro.</div>}{selectedDayItems.map(item=><article className="agenda-item" key={item.id}><div className="agenda-time"><strong>{timeHHMM(item.time)}</strong><span>{item.bookingDurationMinutes} min bloqueados</span></div><div className="agenda-content"><div className="agenda-title-row"><strong>{item.serviceName}</strong><span className={`status ${item.status}`}>{statusText(item.status)}</span></div><span><MapPin size={14}/> {item.workResourceName||'Recurso anterior sin asignar'}</span><span><Clock3 size={14}/> Duración total: {durationLabel(item.durationMinutes)}</span><span><UserRound size={14}/> {item.fullName}</span>{item.phone&&<span><Phone size={14}/> {item.phone}</span>}</div><div className="agenda-actions">{item.status==='pending'&&<button title="Confirmar" onClick={()=>changeStatus(item,'confirmed')}><Check size={17}/></button>}{item.status==='confirmed'&&item.phone&&<button title="Enviar confirmación por WhatsApp" onClick={()=>sendConfirmation(item)}><MessageCircle size={17}/></button>}{item.status==='pending'&&<button title="Cancelar" onClick={()=>changeStatus(item,'cancelled')}><X size={17}/></button>}</div></article>)}</div></section></div>
-
-    {chargeTarget&&<div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setChargeTarget(null)}><div className="modal"><button className="modal-close" type="button" onClick={()=>setChargeTarget(null)}><X size={18}/></button><span className="section-kicker">Cobro de servicio</span><h2>Marcar turno como cobrado</h2><p className="modal-subtitle">{chargeTarget.serviceName} · {chargeTarget.fullName}</p><form className="editor-form" onSubmit={submitCharge}><div className="charge-summary"><span>Precio del servicio</span><strong>{money(chargeBase)}</strong></div><label><span>Medio de pago</span><select value={chargeForm.paymentMethod} onChange={e=>setChargeForm({...chargeForm,paymentMethod:e.target.value})}><option>Efectivo</option><option>Transferencia</option><option>Débito</option><option>Crédito</option><option>Mercado Pago</option><option>Otro</option></select></label><div className="form-grid"><label><span>Descuento</span><select value={chargeForm.discountType} onChange={e=>setChargeForm({...chargeForm,discountType:e.target.value,discountValue:0})}><option value="none">Sin descuento</option><option value="amount">Monto fijo</option><option value="percent">Porcentaje</option></select></label><label><span>{chargeForm.discountType==='percent'?'Porcentaje (%)':'Monto descuento'}</span><input type="number" min="0" max={chargeForm.discountType==='percent'?100:undefined} step="0.01" disabled={chargeForm.discountType==='none'} value={chargeForm.discountValue} onChange={e=>setChargeForm({...chargeForm,discountValue:e.target.value})}/></label></div><label><span>Observaciones</span><textarea rows="2" value={chargeForm.notes} onChange={e=>setChargeForm({...chargeForm,notes:e.target.value})}/></label><div className="charge-total"><span>Total a registrar</span><strong>{money(chargeFinal)}</strong></div><button disabled={busyId===chargeTarget.id} className="btn btn-primary full-width" type="submit"><DollarSign size={17}/> Confirmar cobro y generar venta</button></form></div></div>}
+    <div className="admin-booking-layout"><AppointmentCalendar data={data} month={month} onMonthChange={setMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} admin/><section className="admin-day-agenda"><div className="day-agenda-header"><div><span className="section-kicker">Agenda del día</span><h2>{formatDate(selectedDate)}</h2></div><div className="agenda-filters"><select value={resourceFilter} onChange={e=>setResourceFilter(e.target.value)}><option value="all">Todos los recursos</option>{resources.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select><select value={filter} onChange={e=>setFilter(e.target.value)}><option value="active">Activos</option><option value="pending">Pendientes</option><option value="confirmed">Confirmados</option><option value="blocked">Bloqueos</option></select></div></div><div className="day-agenda-list">{selectedDayItems.length===0&&<div className="empty-agenda">No hay turnos registrados para este filtro.</div>}{selectedDayItems.map(item=><article className="agenda-item" key={item.id}><div className="agenda-time"><strong>{timeHHMM(item.time)}</strong><span>{item.bookingDurationMinutes} min bloqueados</span></div><div className="agenda-content"><div className="agenda-title-row"><strong>{item.serviceName}</strong><span className={`status ${item.status}`}>{statusText(item.status)}</span></div><span><MapPin size={14}/> {item.workResourceName||'Recurso anterior sin asignar'}</span><span><Clock3 size={14}/> Duración total: {durationLabel(item.durationMinutes)}</span><span><UserRound size={14}/> {item.fullName}</span>{item.phone&&<span><Phone size={14}/> {item.phone}</span>}</div><div className="agenda-actions">{item.status==='pending'&&<button title="Confirmar" onClick={()=>changeStatus(item,'confirmed')}><Check size={17}/></button>}{item.status==='confirmed'&&<button disabled={busyId===item.id} title="Marcar servicio como completado" onClick={()=>changeStatus(item,'completed')}><CheckCircle2 size={17}/></button>}{item.status==='confirmed'&&item.phone&&<button title="Enviar confirmación por WhatsApp" onClick={()=>sendConfirmation(item)}><MessageCircle size={17}/></button>}{item.status==='pending'&&<button title="Cancelar" onClick={()=>changeStatus(item,'cancelled')}><X size={17}/></button>}</div></article>)}</div></section></div>
 
     {modalOpen&&<div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&setModalOpen(false)}><div className="modal"><button className="modal-close" type="button" onClick={()=>setModalOpen(false)}><X size={18}/></button><span className="section-kicker">Administración</span><h2>Registrar en agenda</h2><p className="modal-subtitle">Fecha: <strong>{formatDate(selectedDate)}</strong></p><form className="editor-form" onSubmit={submit}><div className="catalog-tabs compact-tabs"><button type="button" className={form.type==='appointment'?'active':''} onClick={()=>setForm({...form,type:'appointment'})}>Turno confirmado</button><button type="button" className={form.type==='blocked'?'active':''} onClick={()=>setForm({...form,type:'blocked'})}><Ban size={15}/> Bloqueo</button></div>{form.type==='appointment'&&<label><span>Servicio</span><select required value={form.serviceId} onChange={e=>changeService(e.target.value)}>{services.map(service=><option key={service.id} value={service.id}>{service.name} · bloquea {service.bookingDurationMinutes} min</option>)}</select></label>}<label><span>Plataforma / área</span><select required value={form.workResourceId} onChange={e=>setForm({...form,workResourceId:e.target.value})}><option value="">Seleccionar</option>{modalResources.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><div className="form-grid"><label><span>Hora</span><input required type="time" step="1800" value={form.time} onChange={e=>setForm({...form,time:e.target.value})}/></label><label><span>Tiempo bloqueado (min)</span><input type="number" min="15" step="15" value={form.durationMinutes} onChange={e=>setForm({...form,durationMinutes:e.target.value})} disabled={form.type==='appointment'}/></label></div>{form.type==='appointment'&&<div className="form-grid"><label><span>Nombre completo</span><input required value={form.fullName} onChange={e=>setForm({...form,fullName:e.target.value})}/></label><label><span>Celular</span><input required value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></label></div>}<button className="btn btn-primary full-width" type="submit"><CalendarPlus size={17}/> {form.type==='blocked'?'Bloquear recurso':'Registrar turno'}</button></form></div></div>}
   </>
